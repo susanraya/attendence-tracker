@@ -2,6 +2,640 @@
 openapi: 3.1.0
 info:
   title: attendence tracker
-  version: architecture-v0
+  version: architecture-v1
   description: Designed API from the approved architecture (not extracted from code).
-paths: {}
+paths:
+  /attendance/me:
+    get:
+      summary: Student's own attendance percentage per course with shortage flags.
+      description: Student's own attendance percentage per course with shortage flags.
+      operationId: get_attendance_me
+      parameters: []
+      responses:
+        '200':
+          description: '{courses: [{course, percentage, below_threshold}]}'
+      security:
+      - bearerAuth: []
+  /attendance/{record_id}:
+    patch:
+      summary: Correct a saved mark; writes immutable audit entry and queues recompute.
+      description: Correct a saved mark; writes immutable audit entry and queues recompute.
+      operationId: patch_attendance_record_id
+      parameters:
+      - name: record_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: '{status}'
+      responses:
+        '200':
+          description: '{record}'
+      security:
+      - bearerAuth: []
+  /audit/attendance:
+    get:
+      summary: Review attendance-change audit entries (read-only).
+      description: Review attendance-change audit entries (read-only).
+      operationId: get_audit_attendance
+      parameters: []
+      responses:
+        '200':
+          description: '{entries: [{old, new, actor, timestamp}]}'
+      security:
+      - bearerAuth: []
+  /auth/login:
+    post:
+      summary: Authenticate with email/password, returns role-scoped JWT; generic
+        error on failure.
+      description: Authenticate with email/password, returns role-scoped JWT; generic
+        error on failure.
+      operationId: post_auth_login
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: '{email, password}'
+      responses:
+        '200':
+          description: '{token, role, must_set_password, consent_required}'
+  /auth/password-reset/request:
+    post:
+      summary: Request a password reset link sent to registered email via SendGrid.
+      description: Request a password reset link sent to registered email via SendGrid.
+      operationId: post_auth_password_reset_request
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: '{email}'
+      responses:
+        '200':
+          description: 202 accepted
+  /auth/set-password:
+    post:
+      summary: Set a new password from a reset/initial token.
+      description: Set a new password from a reset/initial token.
+      operationId: post_auth_set_password
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: '{token, new_password}'
+      responses:
+        '200':
+          description: '{status}'
+  /config/threshold:
+    get:
+      summary: Read current attendance threshold (default 75%).
+      description: Read current attendance threshold (default 75%).
+      operationId: get_config_threshold
+      parameters: []
+      responses:
+        '200':
+          description: '{attendance_threshold}'
+      security:
+      - bearerAuth: []
+    put:
+      summary: Set the minimum attendance threshold.
+      description: Set the minimum attendance threshold.
+      operationId: put_config_threshold
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: '{attendance_threshold}'
+      responses:
+        '200':
+          description: '{attendance_threshold}'
+      security:
+      - bearerAuth: []
+  /consent:
+    post:
+      summary: Record DPDP consent acknowledgement with timestamp.
+      description: Record DPDP consent acknowledgement with timestamp.
+      operationId: post_consent
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: '{acknowledged: true}'
+      responses:
+        '200':
+          description: '{status}'
+      security:
+      - bearerAuth: []
+    delete:
+      summary: Withdraw consent; records withdrawal timestamp.
+      description: Withdraw consent; records withdrawal timestamp.
+      operationId: delete_consent
+      parameters: []
+      responses:
+        '200':
+          description: '{status}'
+      security:
+      - bearerAuth: []
+  /courses:
+    post:
+      summary: Add or correct a single course record; warns on duplicates.
+      description: Add or correct a single course record; warns on duplicates.
+      operationId: post_courses
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: '{code, name, department}'
+      responses:
+        '200':
+          description: '{course}'
+      security:
+      - bearerAuth: []
+  /dashboard/faculty:
+    get:
+      summary: 'Faculty dashboard: assigned classes, unmarked sessions, flagged students.'
+      description: 'Faculty dashboard: assigned classes, unmarked sessions, flagged
+        students.'
+      operationId: get_dashboard_faculty
+      parameters: []
+      responses:
+        '200':
+          description: '{classes[], pending_sessions[], flagged_students[]}'
+      security:
+      - bearerAuth: []
+  /imports:
+    post:
+      summary: Upload Excel/CSV of students, courses or timetables; stored to S3 and
+        queued for validation.
+      description: Upload Excel/CSV of students, courses or timetables; stored to
+        S3 and queued for validation.
+      operationId: post_imports
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: multipart file + type
+      responses:
+        '200':
+          description: '{job_id, status}'
+      security:
+      - bearerAuth: []
+  /imports/{id}:
+    get:
+      summary: Get import job status, row summary and per-row errors.
+      description: Get import job status, row summary and per-row errors.
+      operationId: get_imports_id
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: '{status, rows_imported, row_errors}'
+      security:
+      - bearerAuth: []
+  /notifications:
+    get:
+      summary: List the user's in-app notifications including shortage alerts.
+      description: List the user's in-app notifications including shortage alerts.
+      operationId: get_notifications
+      parameters: []
+      responses:
+        '200':
+          description: '{notifications[]}'
+      security:
+      - bearerAuth: []
+  /reports:
+    post:
+      summary: Generate a filtered attendance report (student/course/class/date range);
+        faculty scoped to assigned classes.
+      description: Generate a filtered attendance report (student/course/class/date
+        range); faculty scoped to assigned classes.
+      operationId: post_reports
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: '{filters, format: excel|pdf|json}'
+      responses:
+        '200':
+          description: '{job_id} or report rows'
+      security:
+      - bearerAuth: []
+  /reports/{id}/download:
+    get:
+      summary: Download generated Excel/PDF report from S3 via signed URL.
+      description: Download generated Excel/PDF report from S3 via signed URL.
+      operationId: get_reports_id_download
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: '{download_url}'
+      security:
+      - bearerAuth: []
+  /sessions/{id}/roster:
+    get:
+      summary: Get enrolled students and current marks for an assigned session.
+      description: Get enrolled students and current marks for an assigned session.
+      operationId: get_sessions_id_roster
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: '{session, students[]}'
+      security:
+      - bearerAuth: []
+    put:
+      summary: Save present/absent marks for a session and mark it completed.
+      description: Save present/absent marks for a session and mark it completed.
+      operationId: put_sessions_id_roster
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: '{marks: [{student_id, status}]}'
+      responses:
+        '200':
+          description: '{status}'
+      security:
+      - bearerAuth: []
+  /students:
+    post:
+      summary: Add or correct a single student record; warns on duplicates.
+      description: Add or correct a single student record; warns on duplicates.
+      operationId: post_students
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: '{roll_no, full_name, email, department}'
+      responses:
+        '200':
+          description: '{student}'
+      security:
+      - bearerAuth: []
+  /timetable:
+    post:
+      summary: Add or correct a timetable/session entry.
+      description: Add or correct a timetable/session entry.
+      operationId: post_timetable
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: '{course_id, scheduled_at}'
+      responses:
+        '200':
+          description: '{session}'
+      security:
+      - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    users:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        password_hash:
+          type: string
+        role:
+          type: string
+        must_set_password:
+          type: boolean
+        consent_given_at:
+          type: string
+          format: date-time
+        consent_withdrawn_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - email
+      - role
+      - must_set_password
+      - created_at
+    students:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        roll_no:
+          type: string
+        full_name:
+          type: string
+        department:
+          type: string
+      required:
+      - id
+      - user_id
+      - roll_no
+      - full_name
+    courses:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+        department:
+          type: string
+      required:
+      - id
+      - code
+      - name
+    course_assignments:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        faculty_user_id:
+          type: string
+          format: uuid
+        course_id:
+          type: string
+          format: uuid
+      required:
+      - id
+      - faculty_user_id
+      - course_id
+    enrollments:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        student_id:
+          type: string
+          format: uuid
+        course_id:
+          type: string
+          format: uuid
+      required:
+      - id
+      - student_id
+      - course_id
+    class_sessions:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        course_id:
+          type: string
+          format: uuid
+        scheduled_at:
+          type: string
+          format: date-time
+        status:
+          type: string
+        marked_by:
+          type: string
+          format: uuid
+      required:
+      - id
+      - course_id
+      - scheduled_at
+      - status
+    attendance_records:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        session_id:
+          type: string
+          format: uuid
+        student_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+        marked_by:
+          type: string
+          format: uuid
+        updated_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - session_id
+      - student_id
+      - status
+      - marked_by
+      - updated_at
+    attendance_audit:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        attendance_record_id:
+          type: string
+          format: uuid
+        actor_user_id:
+          type: string
+          format: uuid
+        old_status:
+          type: string
+        new_status:
+          type: string
+        changed_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - attendance_record_id
+      - actor_user_id
+      - new_status
+      - changed_at
+    attendance_summary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        student_id:
+          type: string
+          format: uuid
+        course_id:
+          type: string
+          format: uuid
+        sessions_present:
+          type: integer
+        sessions_held:
+          type: integer
+        percentage:
+          type: number
+        below_threshold:
+          type: boolean
+        computed_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - student_id
+      - course_id
+      - sessions_present
+      - sessions_held
+      - percentage
+      - below_threshold
+      - computed_at
+    app_config:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        attendance_threshold:
+          type: number
+        updated_by:
+          type: string
+          format: uuid
+        updated_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - attendance_threshold
+      - updated_at
+    import_jobs:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        import_type:
+          type: string
+        s3_key:
+          type: string
+        status:
+          type: string
+        rows_imported:
+          type: integer
+        row_errors:
+          type: string
+        created_by:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - import_type
+      - s3_key
+      - status
+      - created_by
+      - created_at
+    notifications:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        course_id:
+          type: string
+          format: uuid
+        type:
+          type: string
+        message:
+          type: string
+        email_status:
+          type: string
+        read_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - user_id
+      - type
+      - message
+      - created_at
+    ict_audit_log:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        actor_user_id:
+          type: string
+          format: uuid
+        action:
+          type: string
+        entity:
+          type: string
+        detail:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - action
+      - created_at
