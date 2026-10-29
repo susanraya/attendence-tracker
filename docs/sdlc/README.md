@@ -14,15 +14,15 @@ attendence management system
 | Document | State |
 |---|---|
 | [Requirements](requirements/README.md) | v1 approved |
-| [Architecture](architecture/README.md) | 8 entries |
-| [Development](development/README.md) | 1 entry |
+| [Architecture](architecture/README.md) | 5 entries |
+| [Development](development/README.md) | 9 entries |
 | [Testing](testing/README.md) | 1 entry |
 | [Deployment](deployment/README.md) | 1 entry |
 | [Maintenance](maintenance/README.md) | 1 entry |
 | [Data model](architecture/data-model.md) | generated |
 | [API (OpenAPI)](architecture/api/openapi.yaml) | generated |
 | [Decisions (ADRs)](architecture/adr/README.md) | 4 decisions |
-| [Sprint plan](development/sprint-plan.md) | not generated yet |
+| [Sprint plan](development/sprint-plan.md) | 6 sprints |
 | [Developer guide](development/developer-guide.md) | not generated yet |
 | [API reference](development/api-reference.md) | 0 routes |
 | [Test report](testing/test-report.md) | not run yet |
@@ -39,29 +39,46 @@ attendence management system
 <!-- sdlc:auto:start open-gaps -->
 ### Requirements
 
-- Assumption that parents/guardians have no accounts is not yet confirmed by the institution.
-- DPDP data-principal rights beyond consent withdrawal (e.g. access, correction, erasure, grievance redressal) are not specified.
-- Verifiable parental consent for students under 18 (required by DPDP for minors) is not addressed; unclear if any enrolled students are minors.
-- No live SIS/ERP or LMS integration (LTI/OneRoster/SCORM) is implemented - confirm this is acceptable long-term or only an initial-scope limitation.
-- No leave-application or condonation workflow exists in this scope - confirm this matches institutional policy for exam eligibility decisions.
-- CERT-In's 6-hour cyber-incident reporting obligation and DPDP's breach-notification-to-Board/affected-persons process are not addressed beyond log retention.
-- Significant Data Fiduciary obligations (in-India DPO, periodic audits, data protection impact assessment) have not been evaluated for this institution.
-- DPDP consent-manager mechanism is not addressed - current design only captures a direct acknowledge/withdraw action.
-- GIGW guidelines applicability is unconfirmed (relevant only if this is a government-run institution).
+- DPDP Act 2023: verifiable parental consent for data principals under 18 is not addressed; whether any enrolled students are minors is unconfirmed.
+- DPDP Act 2023 data-principal rights beyond consent withdrawal (access, correction, erasure, grievance redressal, consent-manager support) are not addressed by any requirement.
+- No SIS/LMS interoperability (OneRoster, LTI) is in scope; manual Excel/CSV import is the chosen approach - confirm this meets institutional integration needs.
+- No condonation/leave-approval workflow is in scope, which limits formal academic-integrity dispute handling - confirm this is acceptable to the institution.
+- The required decimal precision for displayed percentages is not numerically specified.
+- CERT-In 6-hour breach reporting workflow and DPDP Data Protection Board breach-notification process are not covered by any requirement.
+- Whether the institution is a 'Significant Data Fiduciary' under DPDP (requiring an India-based DPO, periodic audits, and a DPIA) has not been assessed.
+- GIGW guideline applicability (relevant if the institution is government-run) has not been assessed.
+- IT (Intermediary) Rules 2021 obligations (grievance officer, content takedown process) are not addressed.
+- Scaling targets (a few thousand users, term-start/exam peaks) have not been load-tested since the testing phase has not started.
+
+### Architecture
+
+- Data-residency claim depends on AWS ap-south-1 for compute/storage, but RDS backup snapshots, CloudWatch/observability logs and any CDN edge caching are not explicitly confirmed to remain within India.
+- JWT expiry/refresh strategy is not specified in the architecture input.
 
 ### Development
 
-- Development has not started or no development records have been supplied - no tickets, commits, or implementation notes exist to document.
+- Input lists sprint goals and a flat backlog of items but does not explicitly map each item to a sprint number; exact sprint scheduling per item is not confirmed.
+- No sprint start/end dates were given.
+- No completion/status field is provided for any item - cannot confirm whether this work has actually been implemented, only that it is planned and assigned.
+- No completion/status field is provided for any item.
+- Atomic/no-partial-corruption behavior (T4) is planned but not yet verified by any test since the testing phase is absent.
+- Audit-trail immutability is planned but not yet verified by any test.
+- No completion/status field is provided for this item.
+- Email delivery and failure-logging behavior are planned but not yet verified by any test.
+- The accessibility test suite (T3) is planned for a qa-agent but no results have been reported - WCAG 2.1 AA / RPwD Act 2016 conformance is not yet verified.
 
 ### Testing
 
-- Testing phase has not started - no test plans or results are available yet.
+- No test plans, cases, or execution results exist yet.
+- Accessibility test suite (US-020-T3, planned for qa-agent) has not been executed or reported.
+- No verification exists for compliance-critical behaviors: RBAC isolation, audit-trail immutability, 180-day log retention, import atomicity/no-partial-corruption, and default 75% threshold behavior.
 
 ### Deployment
 
-- No deployment recorded yet - the system has not been released to any environment as far as this input shows.
+- No deployment environment, release date, or rollout status is recorded.
+- The India data-residency claim and 180-day CERT-In log retention cannot be operationally confirmed until a deployment is recorded.
 
 ### Maintenance
 
-- No post-deployment/maintenance notes recorded yet - project has not reached operations.
+- No incident, patch, or support history exists yet since the project has not been deployed.
 <!-- sdlc:auto:end open-gaps -->
