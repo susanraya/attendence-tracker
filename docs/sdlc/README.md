@@ -5,7 +5,7 @@
 <!-- sdlc:auto:start overview -->
 attendence management system
 
-**Documentation version:** v1
+**Documentation version:** v2
 <!-- sdlc:auto:end overview -->
 
 ## Contents
@@ -27,11 +27,11 @@ attendence management system
 | [API reference](development/api-reference.md) | 0 routes |
 | [Test report](testing/test-report.md) | not run yet |
 | [Tests](testing/test-cases.md) | 0 tests |
-| [Deployment guide](deployment/deployment-guide.md) | not deployed yet |
-| [Runbook](deployment/runbook.md) | not deployed yet |
-| [Release notes](deployment/release-notes.md) | 0 releases |
+| [Deployment guide](deployment/deployment-guide.md) | deployed |
+| [Runbook](deployment/runbook.md) | deployed |
+| [Release notes](deployment/release-notes.md) | 1 release |
 | [Traceability matrix](traceability-matrix.md) | 20 requirements |
-| [Changelog](CHANGELOG.md) | 1 version |
+| [Changelog](CHANGELOG.md) | 2 versions |
 <!-- sdlc:auto:end contents -->
 
 ## Open gaps
@@ -75,8 +75,13 @@ attendence management system
 
 ### Deployment
 
-- No deployment environment, release date, or rollout status is recorded.
-- The India data-residency claim and 180-day CERT-In log retention cannot be operationally confirmed until a deployment is recorded.
+- No deployment date/timestamp provided.
+- No record of who approved or triggered this deployment.
+- No release notes or changelog indicating which requirements (US-001..US-020) or tickets this version includes -- cannot link related_ids.
+- No information on deployment environment/infrastructure configuration, environment variables, or database migration status.
+- No rollback plan or previous-version reference recorded.
+- No monitoring, alerting, or health-check confirmation included for this deployment.
+- No confirmation that this version passed testing prior to going live (testing phase input not supplied here).
 
 ### Maintenance
 
