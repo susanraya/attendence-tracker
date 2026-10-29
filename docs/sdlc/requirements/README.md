@@ -5,292 +5,106 @@
 <!-- sdlc:auto:start narrative -->
 ## Summary
 
-### REQ-META-001 · approved · source: requirements:stack+services+scope
+### EPIC-001 · draft · source: requirements:EPIC-001
 
-Approved technology stack, runtime services, API keys, and explicit scope boundaries for the lightweight attendance-tracker build.
+Email/password login with role-based access control for faculty, students and admins/HODs; accounts are provisioned from imported rosters; DPDP consent is captured at first login with withdrawal supported.
 
-Delivery scope: lightweight. Requirements version: 1. Stack approved by product owner (design against exactly these): Backend FastAPI 0.115 (tabular/rule-based processing, pandas/openpyxl for import+export); Cloud AWS (Mumbai/Hyderabad regions for India data residency and term-start/marking peak capacity); Database PostgreSQL 16 (relational attendance data, transactional correction+audit-log writes); Frontend React 19 (accessible, keyboard-navigable components for WCAG 2.1 AA / RPwD, low-bandwidth mobile/laptop use). Runtime services: SendGrid (SaaS email, env SENDGRID_API_KEY) for shortage alerts; Amazon S3 (SaaS storage, envs AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY/AWS_REGION/S3_BUCKET) for roster uploads and exported reports, India-resident; Redis (container redis:7-alpine) as background job queue for import parsing, recomputation, report generation and batch email. API keys needed: AWS_ACCESS_KEY_ID, AWS_REGION, AWS_SECRET_ACCESS_KEY, REDIS_URL, S3_BUCKET, SENDGRID_API_KEY. Explicitly out of scope: biometric fingerprint/RFID attendance devices; native iOS/Android apps. Capabilities in scope: roster present/absent marking, per-student/per-course percentage computation, below-threshold flagging (default 75%), student/course/timetable record entry, faculty dashboard, email/password login.
+US-001: login with email/password, generic error on failure (non-revealing), password reset via emailed link (AC-001..AC-003). US-002: RBAC - students see only their own data, faculty only assigned classes, admins manage data/config/reports but cannot alter the audit trail (AC-004..AC-006). US-003: accounts auto-provisioned from student/faculty roster import with correct role; first-ever login forces the user to set their own password (AC-007, AC-008). US-004: DPDP consent notice shown and must be acknowledged (with timestamp) before access; consent can later be withdrawn from privacy settings with the withdrawal recorded (AC-009, AC-010). Stated assumption: parents/guardians have no accounts in the initial scope.
 
-- ⚠ No architecture document yet translates this approved stack into a component/deployment design — architecture phase has not started.
+**Related:** US-001, US-002, US-003, US-004, AC-001, AC-002, AC-003, AC-004, AC-005, AC-006, AC-007, AC-008, AC-009, AC-010
 
-### US-001 · draft · source: requirements:EPIC-001:US-001
+- ⚠ Assumption that parents/guardians have no accounts is not yet confirmed by the institution.
+- ⚠ DPDP data-principal rights beyond consent withdrawal (e.g. access, correction, erasure, grievance redressal) are not specified.
+- ⚠ Verifiable parental consent for students under 18 (required by DPDP for minors) is not addressed; unclear if any enrolled students are minors.
 
-Registered faculty, students, and admins/HODs log in with email and password and land on the dashboard for their role.
+### EPIC-002 · draft · source: requirements:EPIC-002
 
-AC-001: correct credentials authenticate and route to the role-specific dashboard. AC-002: incorrect email or password is denied with a generic error that does not reveal which field was wrong (satisfies NFR-006). AC-003: a forgotten-password request sends a reset link to the registered email, allowing the user to set a new password. Priority: critical.
+Admins load students, courses and timetables each term via Excel/CSV upload, with validation and manual correction of individual records; no live SIS/ERP integration.
 
-**Related:** EPIC-001, AC-001, AC-002, AC-003, NFR-006
+US-005: upload Excel/CSV for students, courses or timetables; successful import shows a row-count summary; invalid files are rejected or partially reported with a per-row error list and no partial corruption; unresolved cross-references (e.g. timetable referencing a missing course/student) are flagged, not silently orphaned (AC-011..AC-013). US-006: admins can add/edit individual student, course or timetable records without re-uploading the whole file, with duplicate detection warning before save (AC-014, AC-015). Explicitly out of scope: biometric/RFID devices and any live SIS/ERP/LMS integration (no LTI/OneRoster implemented).
 
-- ⚠ Reset-link expiry/validity period is not specified.
+**Related:** US-005, US-006, AC-011, AC-012, AC-013, AC-014, AC-015
 
-### US-002 · draft · source: requirements:EPIC-001:US-002
+- ⚠ No live SIS/ERP or LMS integration (LTI/OneRoster/SCORM) is implemented - confirm this is acceptable long-term or only an initial-scope limitation.
 
-Role-based access control restricts features and data so students, faculty, and admins/HODs only see what their role permits.
+### EPIC-003 · draft · source: requirements:EPIC-003
 
-AC-004: a student attempting attendance-marking or admin screens is denied and sees only their own attendance (ties to NFR-001). AC-005: faculty can mark/view rosters only for classes assigned to them. AC-006: admin/HOD can manage imported data, configuration, and reports but cannot alter the audit trail (ties to NFR-005, tamper-evident audit trail). Priority: critical.
+Faculty mark present/absent on an assigned session's roster and can later correct a saved mark, with every correction captured in an immutable audit trail.
 
-**Related:** EPIC-001, AC-004, AC-005, AC-006, NFR-001, NFR-005
+US-007: faculty open the roster for an assigned scheduled session, see enrolled students, mark each present/absent, and save; the session is then shown as completed; marking/saving must remain usable on a low-bandwidth mobile connection without a native app (AC-016..AC-018). US-008: faculty can change a previously saved status; the change is saved and an immutable audit-log entry records who changed what, when, and the old/new values; admins/HODs can review (but not alter) this log (AC-019, AC-020). Stated assumption: there is no formal leave/condonation approval workflow in the initial scope.
 
-### US-003 · draft · source: requirements:EPIC-001:US-003
+**Related:** US-007, US-008, AC-016, AC-017, AC-018, AC-019, AC-020
 
-Accounts for students and faculty are auto-provisioned from imported rosters with the correct role, avoiding manual creation at scale.
+- ⚠ No leave-application or condonation workflow exists in this scope - confirm this matches institutional policy for exam eligibility decisions.
 
-AC-007: on successful roster import containing student/faculty records with emails, accounts are provisioned with the correct role. AC-008: a provisioned account that has never logged in is prompted, via an initial credential or reset flow, to set its own password before continuing. Priority: high. Depends on the term-import pipeline (EPIC-002).
+### EPIC-004 · draft · source: requirements:EPIC-004
 
-**Related:** EPIC-001, EPIC-002, AC-007, AC-008
+Attendance percentage is computed per student per course (sessions present / sessions held) and recalculated on correction; students below a configurable threshold (default 75%) are flagged.
 
-- ⚠ Exact delivery mechanism for the 'initial credential' (temporary password vs. reset-link-only) is not specified.
+US-009: percentage computed to a consistent precision and recalculated whenever a session's marks are corrected (AC-021, AC-022). US-010: admins configure the minimum threshold on a configuration screen; saved value applies to flagging; default of 75% is used until configured (AC-023, AC-024). US-011: students below the configured threshold for a course are visibly flagged on the relevant dashboard; those at/above threshold show no flag (AC-025, AC-026).
 
-### US-004 · draft · source: requirements:EPIC-001:US-004
+**Related:** US-009, US-010, US-011, AC-021, AC-022, AC-023, AC-024, AC-025, AC-026
 
-A DPDP consent notice is shown at first login and must be acknowledged; users can later withdraw consent from privacy settings.
+### EPIC-005 · draft · source: requirements:EPIC-005
 
-DPDP Act 2023: notice-and-consent, data-principal right to withdraw consent. AC-009: consent notice must be acknowledged before system access, acknowledgement timestamped. AC-010: a user who previously consented can withdraw it from privacy settings as easily as it was given, and the withdrawal is recorded. Assumption stated in input: a DPDP consent notice with withdrawal is required. Priority: high.
+Faculty dashboard surfaces assigned classes, sessions still needing marking, and students flagged below the attendance threshold.
 
-**Related:** EPIC-001, AC-009, AC-010
+US-012: faculty see, on one dashboard, their assigned classes, outstanding (unmarked) sessions, and flagged below-threshold students; selecting an unmarked session navigates directly to its roster for marking (AC-027, AC-028).
 
-- ⚠ No mechanism for verifiable parental/guardian consent for any enrolled student under 18 is described; confirm whether any students are minors, since current scope assumes guardians have no accounts.
-- ⚠ DPDP breach-notification duties and 'Significant Data Fiduciary' obligations (in-India DPO, audits, impact assessments) are not addressed by this or any other story.
+**Related:** US-012, AC-027, AC-028
 
-### US-005 · draft · source: requirements:EPIC-002:US-005
+### EPIC-006 · draft · source: requirements:EPIC-006
 
-Admins upload Excel/CSV files of students, courses, and class timetables each term; a row-import summary is shown.
+Students view their own per-course attendance percentage and threshold status, and receive in-app plus email shortage alerts; they cannot see other students' data.
 
-AC-011: a correctly formatted file creates records and shows a summary of rows imported. AC-012: a file with missing required columns or invalid rows is rejected or partially reported with a per-row error list, leaving no partial corruption (ties to NFR-013). AC-013: a timetable referencing a nonexistent student/course is flagged as an unresolved reference rather than silently creating orphans. Runs as a background job (ties to NFR-010). Priority: critical.
+US-013: students see their percentage and below-threshold status per course; attempts to view another student's data are denied (AC-029, AC-030). US-014: when attendance drops below threshold, the student gets an in-app flag and an email alert naming the course; if the email provider credential is not configured or sending fails, the in-app alert still shows and the failure is logged for admin attention (AC-031, AC-032).
 
-**Related:** EPIC-002, AC-011, AC-012, AC-013, NFR-010, NFR-013
+**Related:** US-013, US-014, AC-029, AC-030, AC-031, AC-032
 
-- ⚠ Exact required column schema/template for student, course, and timetable files is not specified.
+### EPIC-007 · draft · source: requirements:EPIC-007
 
-### US-006 · draft · source: requirements:EPIC-002:US-006
+Faculty and admins/HODs generate attendance reports filtered by student, course, class and date range, and export them to Excel or PDF.
 
-Admins can manually add or correct individual student, course, and timetable records without re-uploading a full spreadsheet.
+US-015: report generation filters by student/course/class/date-range and returns only matching records with computed percentages; faculty reports are scoped to their assigned classes, admins/HODs can report institution-wide (AC-033, AC-034). US-016: a generated report can be exported as Excel or PDF matching the on-screen data (AC-035, AC-036).
 
-AC-014: an edit or addition is saved and reflected in rosters and computations. AC-015: attempting to create a duplicate student or course record triggers a warning and prevents the duplicate. Priority: medium.
+**Related:** US-015, US-016, AC-033, AC-034, AC-035, AC-036
 
-**Related:** EPIC-002, AC-014, AC-015
+### EPIC-008 · draft · source: requirements:EPIC-008
 
-### US-007 · draft · source: requirements:EPIC-003:US-007
+Cross-cutting India-compliance and accessibility requirements: data residency, audit/ICT logging retention, no tracking/targeted ads, and WCAG 2.1 AA / RPwD Act 2016 accessibility on responsive, low-bandwidth web.
 
-Faculty open the roster for an assigned class session and mark each enrolled student present or absent.
+US-017 - DPDP: student and attendance data must be stored on infrastructure located within India (AC-037). US-018 - CERT-In: security-relevant and attendance-change events are logged with actor/action/timestamp and remain retrievable for 180 days (AC-038, AC-039). US-019 - DPDP/children's-privacy alignment: no third-party tracking scripts or targeted advertising are present (AC-040). US-020 - RPwD Act 2016 / WCAG 2.1 AA: core flows (login, marking, viewing attendance, reports) are responsive on mobile/low-bandwidth and usable with screen readers and keyboard-only navigation (AC-041, AC-042). Stated assumption: no payment/billing functionality is in scope.
 
-AC-016: faculty assigned to a scheduled session see enrolled students and mark each present/absent. AC-017: saving persists the records and marks the session completed. AC-018: on a low-bandwidth mobile connection, the page remains usable and the save succeeds without a native app (ties to NFR-008). Priority: critical.
+**Related:** US-017, US-018, US-019, US-020, AC-037, AC-038, AC-039, AC-040, AC-041, AC-042
 
-**Related:** EPIC-003, AC-016, AC-017, AC-018, NFR-008
+- ⚠ CERT-In's 6-hour cyber-incident reporting obligation and DPDP's breach-notification-to-Board/affected-persons process are not addressed beyond log retention.
+- ⚠ Significant Data Fiduciary obligations (in-India DPO, periodic audits, data protection impact assessment) have not been evaluated for this institution.
+- ⚠ DPDP consent-manager mechanism is not addressed - current design only captures a direct acknowledge/withdraw action.
+- ⚠ GIGW guidelines applicability is unconfirmed (relevant only if this is a government-run institution).
 
-### US-008 · draft · source: requirements:EPIC-003:US-008
+### NFR-PRIVACY-SECURITY · draft · source: requirements:NFR-001,NFR-002,NFR-003,NFR-004,NFR-005,NFR-006
 
-Faculty can edit previously saved attendance; every change is written to an immutable audit log.
+Privacy and security non-functional requirements: data isolation by role, no tracking, India data residency, 180-day audit retention, tamper-evident audit trail, and non-revealing login errors.
 
-AC-019: changing a student's status is saved and logged immutably with who changed what, when, and old/new values (ties to NFR-005). AC-020: admin/HOD reviewing the log sees original and corrected values, actor, and timestamp. Assumption: faculty can edit marked attendance; there is no condonation/approval workflow in the initial scope. Priority: high.
+NFR-001: students see only their own data, faculty only their assigned classes. NFR-002: no third-party tracking or targeted advertising. NFR-003 (DPDP): all student/attendance data persisted within India. NFR-004 (CERT-In): every security-relevant and attendance-change event logged with actor/action/timestamp, retrievable for 180 days. NFR-005: the attendance-change audit log is immutable and tamper-evident; admins/HODs can read but not alter it. NFR-006: failed login shows a generic error not revealing which credential was wrong.
 
-**Related:** EPIC-003, AC-019, AC-020, NFR-005
+**Related:** US-002, US-013, US-019, US-017, US-018, US-008, US-001
 
-### US-009 · draft · source: requirements:EPIC-004:US-009
+### NFR-ACCESSIBILITY-USABILITY · draft · source: requirements:NFR-007,NFR-008,NFR-009
 
-The system computes each student's attendance percentage per course as sessions present divided by sessions held.
+Accessibility and device-compatibility non-functional requirements: WCAG 2.1 AA / RPwD Act 2016 conformance, responsiveness on low bandwidth, and browser-only (no native app) usage.
 
-AC-021: percentage = present / total held sessions for the course, shown to a consistent precision. AC-022: correcting a session recalculates the affected student's percentage for that course. Priority: critical.
-
-**Related:** EPIC-004, AC-021, AC-022
-
-- ⚠ Display precision (number of decimal places) for the percentage is not specified.
-
-### US-010 · draft · source: requirements:EPIC-004:US-010
-
-Admins configure the minimum attendance threshold used for shortage flagging; defaults to 75% if unset.
-
-AC-023: admin sets the threshold on a configuration screen and the value is saved and applied. AC-024: if no threshold is configured, the system defaults to 75%. Assumption: threshold is configurable, default 75%. Priority: high.
-
-**Related:** EPIC-004, AC-023, AC-024
-
-### US-011 · draft · source: requirements:EPIC-004:US-011
-
-Students below the configured threshold are visibly flagged on dashboards; those at or above are not.
-
-AC-025: a student below the configured threshold for a course is visibly flagged on the relevant dashboard. AC-026: a student at or above threshold shows no shortage flag. Priority: high.
-
-**Related:** EPIC-004, AC-025, AC-026, US-010
-
-### US-012 · draft · source: requirements:EPIC-005:US-012
-
-Faculty dashboard shows assigned classes, sessions pending marking, and below-threshold students.
-
-AC-027: dashboard shows faculty's classes, sessions still to mark, and students flagged below threshold. AC-028: selecting an unmarked session from the dashboard goes directly to its roster for marking. Priority: high.
-
-**Related:** EPIC-005, AC-027, AC-028
-
-### US-013 · draft · source: requirements:EPIC-006:US-013
-
-Students view their own attendance percentage per course and whether they are below threshold; cannot see others' data.
-
-AC-029: student's attendance view shows percentage per course and threshold status. AC-030: attempting to view another student's attendance is denied; only own records shown (ties to NFR-001). Priority: high.
-
-**Related:** EPIC-006, AC-029, AC-030, NFR-001
-
-### US-014 · draft · source: requirements:EPIC-006:US-014
-
-Students receive an in-app flag and email alert when their attendance in a course drops below threshold.
-
-AC-031: shortage detection produces an in-app flag plus an email alert naming the affected course. AC-032: if the email provider credential is not configured, the in-app alert is still shown and the email failure is logged for admin attention (ties to NFR-012). Sent via background batch job (ties to NFR-010). Assumption: email uses a transactional provider requiring an SMTP/API credential (SendGrid). Priority: high.
-
-**Related:** EPIC-006, AC-031, AC-032, NFR-010, NFR-012
-
-### US-015 · draft · source: requirements:EPIC-007:US-015
-
-Faculty and admins/HODs generate attendance reports filtered by student, course, class, and date range.
-
-AC-033: filtered report shows only matching records with computed percentages. AC-034: faculty reports are scoped to their assigned classes; admin/HOD can report institution-wide. Priority: high.
-
-**Related:** EPIC-007, AC-033, AC-034
-
-### US-016 · draft · source: requirements:EPIC-007:US-016
-
-A generated report can be exported as a downloadable Excel spreadsheet or PDF matching the on-screen data.
-
-AC-035: Excel export matches on-screen data. AC-036: PDF export matches on-screen data. Generated via background job (ties to NFR-010). Assumption: reports exportable to Excel/PDF across student/course/class/date-range. Priority: medium.
-
-**Related:** EPIC-007, AC-035, AC-036, NFR-010
-
-### US-017 · draft · source: requirements:EPIC-008:US-017
-
-Student and attendance data is stored on infrastructure located within India.
-
-DPDP Act 2023: data-residency / data-handling expectation. AC-037: persisted data is stored on infrastructure located within India. Assumption: data stored within India. Approved stack specifies AWS Mumbai/Hyderabad regions to satisfy this (ties to NFR-003). Priority: high.
-
-**Related:** EPIC-008, AC-037, NFR-003
-
-- ⚠ Which specific AWS region(s) (Mumbai vs. Hyderabad) will be used, and whether backups/disaster-recovery copies also stay in-India, is not yet specified — for the architecture phase to confirm.
-
-### US-018 · draft · source: requirements:EPIC-008:US-018
-
-Security-relevant and attendance-change events are logged and retained for 180 days.
-
-CERT-In directions: ICT/audit log retention of 180 days. AC-038: each event is logged with actor, action, timestamp. AC-039: logs remain retrievable before 180 days elapse. Assumption: CERT-In-aligned logs retained 180 days (ties to NFR-004). Priority: high.
-
-**Related:** EPIC-008, AC-038, AC-039, NFR-004
-
-- ⚠ CERT-In also requires reporting qualifying cyber incidents to CERT-In within 6 hours; no requirement in this input addresses that reporting obligation.
-
-### US-019 · draft · source: requirements:EPIC-008:US-019
-
-The application runs no third-party tracking scripts or targeted advertising.
-
-DPDP Act 2023: no tracking/targeted advertising/profiling, particularly relevant for any minors. AC-040: no third-party tracking or targeted-ad scripts present on page load (ties to NFR-002). Assumption: no tracking/targeted ads. Priority: medium.
-
-**Related:** EPIC-008, AC-040, NFR-002
-
-### US-020 · draft · source: requirements:EPIC-008:US-020
-
-Core flows (login, marking, viewing attendance, reports) are responsive and accessible on mobile/low-bandwidth connections and to assistive technology.
-
-RPwD Act 2016 / WCAG 2.1 AA. AC-041: layout adapts and remains usable on mobile screens or slow connections for all core flows, without a native app (ties to NFR-008). AC-042: screen-reader and keyboard-only navigation conform to WCAG 2.1 AA / RPwD Act expectations (ties to NFR-007). Assumption: accessibility is a release gate. Priority: high.
-
-**Related:** EPIC-008, AC-041, AC-042, NFR-007, NFR-008
-
-- ⚠ No accessibility audit or test plan yet exists to verify WCAG 2.1 AA / RPwD conformance — to be confirmed in the testing phase.
-
-### NFR-001 · draft · source: requirements:NFR-001
-
-Students see only their own attendance data; faculty see only classes assigned to them.
-
-Each student can view only their own attendance records; attempts to open another student's attendance or any marking/admin screen are denied. Faculty see only classes assigned to them. Category: privacy.
-
-**Related:** US-002, US-013
-
-### NFR-002 · draft · source: requirements:NFR-002
-
-No third-party tracking scripts or targeted advertising are run.
-
-DPDP Act 2023: no profiling/tracking/targeted advertising. The application runs no third-party tracking scripts and shows no targeted ads. Category: privacy.
-
-**Related:** US-019
-
-### NFR-003 · draft · source: requirements:NFR-003
-
-All student and attendance data is persisted on infrastructure located within India.
-
-DPDP Act 2023: data-residency expectation. Category: compliance. Mapped to AWS Mumbai/Hyderabad region selection in the approved stack.
-
-**Related:** US-017
-
-### NFR-004 · draft · source: requirements:NFR-004
-
-Security-relevant and attendance-change events are logged and retained for 180 days.
-
-CERT-In directions: ICT log retention target 180 days, with actor/action/timestamp captured per event. Category: compliance.
-
-**Related:** US-018
-
-- ⚠ CERT-In 6-hour incident-reporting obligation to the authority itself is not covered by this NFR.
-
-### NFR-005 · draft · source: requirements:NFR-005
-
-The attendance-change audit log is immutable and reviewable but not alterable by admins/HODs.
-
-Records who changed what, when, and the old/new values. Admins/HODs can review but cannot alter the log. Category: security; supports tamper-evident grade/attendance change tracking (academic-integrity risk area).
-
-**Related:** US-008, US-002
-
-### NFR-006 · draft · source: requirements:NFR-006
-
-A failed login shows a generic error that does not reveal whether the email or password was wrong.
-
-Category: security. Prevents account-enumeration via login error messages.
-
-**Related:** US-001
-
-### NFR-007 · draft · source: requirements:NFR-007
-
-Core flows conform to WCAG 2.1 AA and RPwD Act 2016 expectations, including screen-reader and keyboard-only use.
-
-RPwD Act 2016 / WCAG 2.1 AA: target explicitly stated as a release expectation. Category: accessibility.
-
-**Related:** US-020
-
-### NFR-008 · draft · source: requirements:NFR-008
-
-The web app adapts to mobile screens and remains usable on low-bandwidth connections for all core flows.
-
-Includes marking and saving a roster without a native app. Category: usability.
+NFR-007 (RPwD Act 2016 / WCAG 2.1 AA): core flows conform including screen-reader and keyboard-only use. NFR-008: layout adapts to mobile and remains usable on low-bandwidth connections, including marking and saving a roster. NFR-009: the product is browser-based for phones and laptops; no native mobile app is provided (explicitly out of scope).
 
 **Related:** US-020, US-007
 
-### NFR-009 · draft · source: requirements:NFR-009
+### NFR-PERFORMANCE-SCALE · draft · source: requirements:NFR-010,NFR-011,NFR-012,NFR-013
 
-The product is browser-based on phones and laptops; no native mobile app is provided.
+Performance, scale and resilience non-functional requirements: background processing for heavy jobs, single-institution scale target, graceful email-outage handling, and no partial corruption on import.
 
-Applies to the whole system. Category: compatibility.
+NFR-010: spreadsheet parsing, percentage recomputation, report generation and batch emails run in the background so UI is never blocked. NFR-011: system sized for one institution of a few thousand students/faculty/HODs, including term-start and marking peaks. NFR-012: if SendGrid credential is missing/fails, in-app shortage flag still shows and the failure is logged for admin attention. NFR-013: invalid import files are rejected or partially reported with a per-row error list, leaving no partially corrupted data.
 
-### NFR-010 · draft · source: requirements:NFR-010
-
-Spreadsheet parsing, percentage recomputation, report generation, and batch email run in the background.
-
-Keeps faculty/admins from waiting on a frozen page; implemented via Redis-backed job queue. Category: performance.
-
-**Related:** US-005, US-016, US-014
-
-### NFR-011 · draft · source: requirements:NFR-011
-
-The system supports one institution of around a few thousand students/faculty/HODs, including term-start and session-marking peaks.
-
-Target: ~a few thousand students, single institution. Category: scalability. Applies to the whole system.
-
-### NFR-012 · draft · source: requirements:NFR-012
-
-If the transactional email provider is unavailable, the in-app shortage flag still shows and the failure is logged.
-
-Category: availability. Ensures core shortage-flagging function is not dependent on email delivery.
-
-**Related:** US-014
-
-### NFR-013 · draft · source: requirements:NFR-013
-
-An invalid import file is rejected or partially reported with a clear per-row error list, leaving no partial corruption.
-
-Category: maintainability. Protects data integrity of the term-import pipeline.
-
-**Related:** US-005
+**Related:** US-005, US-016, US-014, US-020
 <!-- sdlc:auto:end narrative -->
 
 <!-- sdlc:auto:start summary -->

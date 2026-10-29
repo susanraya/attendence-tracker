@@ -5,126 +5,69 @@
 <!-- sdlc:auto:start narrative -->
 ## Overview
 
-### ARCH-OVERVIEW · approved · source: architecture:summary
+### ARCH-001 · approved · source: architecture:summary
 
-Approved v1 architecture for a browser-based attendance management system for a single Indian higher-education institution, serving faculty, students and admins/HODs.
+Approved v1 architecture: a browser-based attendance system for one Indian higher-ed institution on React 19 / FastAPI 0.115 / PostgreSQL 16 / AWS Mumbai, with Redis, S3 and SendGrid supporting the full requirements scope.
 
-System is a React 19 SPA over a FastAPI 0.115 backend with email/password RBAC auth, Excel/CSV roster provisioning, immutable-audit present/absent marking, per-student-per-course percentage computation, configurable 75% shortage threshold with alerts, and filtered Excel/PDF reporting. Heavy work (parsing, recomputation, report build, batch emails) is offloaded to a Redis-backed job queue processed by a Python worker. PostgreSQL 16 is the transactional store; S3 (Mumbai) holds uploads/generated files; SendGrid sends transactional email. All data, files and logs are pinned to AWS Indian regions for DPDP residency; ICT/audit logs retained 180 days per CERT-In. Frontend targets WCAG 2.1 AA / RPwD Act accessibility and low-bandwidth usability.
+Components: web (React 19 SPA - login, roster marking, dashboards, student views, report filters, admin config); api (FastAPI 0.115 - REST API, auth/RBAC, import validation, marking/correction with audit, computation, threshold config, report requests, consent records); worker (FastAPI-based background worker - spreadsheet parsing, account provisioning, percentage recompute, Excel/PDF report build, batched shortage emails); db (PostgreSQL 16, hosted in India, system of record with transactional correction+audit writes); queue (Redis 7 job queue); object_store (Amazon S3, Mumbai, for uploads and generated reports); email (SendGrid transactional sender for alerts and password resets). This maps directly onto the approved technology stack and services from the requirements phase (FastAPI/AWS/PostgreSQL/React, SendGrid, S3, Redis).
 
-- ⚠ No explicit mapping given between this architecture and the specific US-001..US-020 requirement descriptions, so traceability to individual requirements could not be confirmed.
-- ⚠ DPDP, CERT-In and RPwD Act are named as compliance drivers but no dedicated compliance/control checklist was supplied for this phase -- recommend a human confirm all applicable controls are covered.
+**Related:** EPIC-001, EPIC-002, EPIC-003, EPIC-004, EPIC-005, EPIC-006, EPIC-007, EPIC-008
 
-### ARCH-COMP-WEB · approved · source: architecture:components:web
+### ARCH-002 · approved · source: architecture:critical_path:Term spreadsheet import
 
-Web Frontend component: an accessible, responsive React 19 single-page app.
+Admin uploads an Excel/CSV of students, courses or timetables; file is stored in S3 and validated in the background with per-row error reporting and reference checks before accounts/records are created.
 
-Handles login, consent, roster marking, dashboards, student attendance views, report filters and exports. Explicitly required to be accessible/responsive and to include no third-party trackers.
+Flow: file uploaded -> stored to S3 -> background job validates every row -> unresolved references (e.g. timetable pointing to a missing course/student) are flagged -> import either rejected or reported per-row with no partial corruption -> successful student/faculty rows provision accounts. Backed by endpoints POST /imports and GET /imports/{id}, and the import_jobs entity (s3_key, status, rows_imported, row_errors).
 
-### ARCH-COMP-API · approved · source: architecture:components:api
+**Related:** EPIC-002, US-005, US-006
 
-API Backend component: FastAPI 0.115 REST service.
+### ARCH-003 · approved · source: architecture:critical_path:Mark and correct attendance with audit
 
-Provides auth/RBAC, consent records, imports, marking, computation, thresholds, dashboards and reports endpoints; writes audit/ICT logs and enqueues background jobs for heavy work.
+Faculty mark/save a session roster; corrections write an immutable audit entry in the same transaction as the attendance update and enqueue percentage recomputation.
 
-### ARCH-COMP-WORKER · approved · source: architecture:components:worker
+Flow: faculty opens roster for an assigned session (GET /sessions/{id}/roster), marks present/absent, saves (PUT /sessions/{id}/roster) which persists records and marks the session completed. A later correction (PATCH /attendance/{record_id}) writes to attendance_audit (actor, old/new status, timestamp) in the same DB transaction as the attendance_records update, and enqueues a Redis job to recompute attendance_summary for the affected student/course. This directly implements NFR-005's tamper-evident, transactional correction+audit requirement.
 
-Background Worker component: FastAPI 0.115-based job consumer.
+**Related:** EPIC-003, EPIC-004, US-007, US-008, US-009
 
-Consumes the Redis job queue to parse spreadsheets, provision accounts, recompute attendance percentages, build Excel/PDF reports, and send batch shortage emails -- keeping this work off the request path.
+### ARCH-004 · approved · source: architecture:critical_path:Compute percentage and shortage alert
 
-### ARCH-COMP-DB · approved · source: architecture:components:db
+A background job recomputes present/held percentage per student per course, compares to the configured threshold, sets the shortage flag, and sends an email alert via SendGrid, logging failures without blocking the in-app flag.
 
-Relational Database component: PostgreSQL 16.
+Worker recomputes attendance_summary.percentage and below_threshold against app_config.attendance_threshold (default 75%), writes a notifications record, and attempts a SendGrid email; failures are logged (notifications.email_status) while the in-app flag is still shown, matching NFR-012's graceful email-outage handling.
 
-Transactional store for users, students, courses, timetables, sessions, attendance, consent, config and audit logs; also runs the aggregation queries that power reports.
+**Related:** EPIC-004, EPIC-006, US-009, US-010, US-011, US-014
 
-### ARCH-COMP-QUEUE · approved · source: architecture:components:queue
+### ARCH-005 · approved · source: architecture:critical_path:Email/password login with RBAC
 
-Job Queue component: Redis 7.
+Login verifies credentials with a generic failure message, issues a role-scoped JWT, and forces first-time users through password setup and DPDP consent acknowledgement before access.
 
-Decouples heavy import/recompute/report/email jobs from the web request path, feeding the background worker.
+POST /auth/login verifies credentials (generic error per NFR-006), issues a role-scoped JWT. First-time users are routed through POST /auth/set-password and must acknowledge consent via POST /consent (recorded with timestamp on users.consent_given_at); DELETE /consent records withdrawal (users.consent_withdrawn_at). users.must_set_password flag drives the forced password-setup step from provisioning (US-003).
 
-### ARCH-COMP-STORAGE · approved · source: architecture:components:storage
+**Related:** EPIC-001, US-001, US-002, US-003, US-004
 
-Object Storage component: Amazon S3.
+### ARCH-006 · approved · source: architecture:entities
 
-Durable storage, within India, of uploaded source spreadsheets and generated Excel/PDF reports.
+Relational data model covering users/roles, academic structure, sessions/marks, audit, configuration and ICT logging.
 
-### ARCH-COMP-EMAIL · approved · source: architecture:components:email
+Entities: users (incl. consent timestamps, must_set_password), students, courses, course_assignments, enrollments, class_sessions, attendance_records, attendance_audit (immutable change log), attendance_summary (computed percentage + below_threshold), app_config (threshold), import_jobs (status/row errors), notifications (in-app + email status), ict_audit_log (security/ICT events). Design directly supports per-student/course/class/date-range reporting, transactional correction+audit, and CERT-In-aligned logging.
 
-Transactional Email component: SendGrid.
+**Related:** EPIC-001, EPIC-002, EPIC-003, EPIC-004, EPIC-006, EPIC-008
 
-Sends shortage-alert and password-reset emails with delivery tracking.
+### ARCH-007 · approved · source: architecture:endpoints
 
-- ⚠ Delivery-tracking data is mentioned but no retention/visibility mechanism for tracking data is specified.
+REST API surface covers auth, consent, imports, manual record entry, roster marking/correction, student self-service, faculty dashboard, threshold config, reporting/export, notifications and audit review.
 
-### ARCH-CP-LOGIN · approved · source: architecture:critical_paths:Login & Role-Based Access
+Endpoints: POST /auth/login, POST /auth/password-reset/request, POST /auth/set-password, POST /consent, DELETE /consent, POST /imports, GET /imports/{id}, POST /students, POST /courses, POST /timetable, GET /sessions/{id}/roster, PUT /sessions/{id}/roster, PATCH /attendance/{record_id}, GET /attendance/me, GET /dashboard/faculty, GET /config/threshold, PUT /config/threshold, POST /reports, GET /reports/{id}/download, GET /notifications, GET /audit/attendance. Each maps 1:1 to a requirement AC (e.g. GET /audit/attendance to AC-020/AC-038).
 
-Critical path for authentication, first-login consent, and per-request role enforcement.
+**Related:** EPIC-001, EPIC-002, EPIC-003, EPIC-004, EPIC-005, EPIC-006, EPIC-007, EPIC-008
 
-User authenticates with email/password. First-time users must set a password and acknowledge the DPDP consent notice. Failed logins return a generic error (does not reveal which field was wrong). A JWT carries the user's role and is enforced on every request. Backed by endpoints POST /auth/login, POST /auth/password-reset/request, POST /auth/password-reset/confirm, GET /consent/status, POST /consent/acknowledge, POST /consent/withdraw.
+### ARCH-008 · approved · source: architecture:deployment_nodes,technology_decisions
 
-### ARCH-CP-IMPORT · approved · source: architecture:critical_paths:Term Spreadsheet Import
+Deployment is containerized on AWS ap-south-1 (Mumbai): web, api and worker containers, RDS PostgreSQL, Redis queue container, S3 bucket, and SendGrid as an external SaaS dependency - chosen to satisfy India data-residency and scale needs.
 
-Critical path for admin bulk-provisioning of students, courses and timetables via spreadsheet upload.
+Nodes: web-app (React static build via CDN/container), api-service (FastAPI/uvicorn, Python 3.12), worker-service (rq worker, Python 3.12), postgres (RDS PostgreSQL 16, ap-south-1), redis (redis:7-alpine container), s3-bucket (S3 ap-south-1), sendgrid (external SaaS). Technology decisions recorded with alternatives considered: React 19 over Vue/Angular for accessible component libraries; FastAPI over Django REST Framework/Flask for pandas/openpyxl + Redis queue fit; PostgreSQL 16 over MySQL/SQLite for relational aggregation + ACID transactions; AWS over Azure/GCP for the Mumbai region satisfying DPDP residency and CERT-In 180-day log retention.
 
-Admin uploads an Excel/CSV of students, courses or timetables. File is stored in S3; a background job parses and validates it, provisions accounts, reports per-row errors, and guarantees no partial corruption on failure. Backed by POST /imports and GET /imports/{id}, with import_jobs table tracking status, rows_imported and error_report.
-
-### ARCH-CP-MARKING · approved · source: architecture:critical_paths:Session Marking & Audit Trail
-
-Critical path for faculty marking attendance with a tamper-evident audit trail.
-
-Faculty open a roster for an assigned session, mark present/absent and save. Corrections write an immutable audit entry (actor, old/new status, timestamp) in the same transaction as the update, and trigger recomputation of attendance percentages. Backed by GET/PUT /sessions/{id}/roster, PUT /attendance/{recordId}, GET /attendance/audit (read-only), and the attendance_records/attendance_audit tables.
-
-### ARCH-CP-SHORTAGE · approved · source: architecture:critical_paths:Shortage Detection & Alerts
-
-Critical path for detecting and alerting on low attendance after any marking or correction.
-
-After marking or correction, the worker recomputes percentage per student per course, flags students below the configured threshold (default 75%), raises an in-app notification, and emails the student. If the email fails, the failure is logged but the in-app flag still shows. Backed by GET/PUT /config/threshold, GET /notifications, course_attendance_summary and notifications tables.
-
-### ARCH-DATA-MODEL · approved · source: architecture:entities
-
-Full relational schema covering identity, academic structure, attendance, audit, config, imports and notifications.
-
-Entities: users (auth/role/password state), consent_records (DPDP acknowledgement/withdrawal history), students, courses, enrollments, course_faculty (assignment), sessions (per-course scheduled class), attendance_records (per-student mark with marked_by/marked_at), attendance_audit (immutable change history: old/new status, changed_by, changed_at), course_attendance_summary (precomputed sessions_present/total, percentage, below_threshold), app_config (key/value settings incl. threshold), import_jobs (upload tracking incl. error_report), notifications (in-app + email_status), and audit_log (general actor/action/entity trail).
-
-### ARCH-API-ENDPOINTS · approved · source: architecture:endpoints
-
-19 REST endpoints covering auth, consent, imports, student/course management, roster marking, attendance correction/audit, dashboards, config and reporting.
-
-Auth: POST /auth/login (generic failure error), POST /auth/password-reset/request, POST /auth/password-reset/confirm (also used for first-login password set). Consent: GET /consent/status, POST /consent/acknowledge, POST /consent/withdraw. Imports: POST /imports, GET /imports/{id}. Records: POST /students and POST /courses (duplicate-prevention warnings). Marking: GET/PUT /sessions/{id}/roster, PUT /attendance/{recordId} (audited correction), GET /attendance/audit (read-only). Views: GET /me/attendance (student), GET /faculty/dashboard. Config: GET/PUT /config/threshold. Reporting: POST /reports (faculty scoped to assigned classes), GET /reports/{id}/export (Excel/PDF from S3). Notifications: GET /notifications.
-
-### ARCH-DEPLOYMENT · approved · source: architecture:deployment_nodes
-
-All seven deployment nodes are hosted in AWS ap-south-1 (Mumbai) for DPDP data residency.
-
-Frontend: static React 19 build on S3 + CloudFront. API service: FastAPI 0.115 on Uvicorn/Python 3.12, ECS Fargate (ap-south-1). Worker service: Python 3.12 RQ worker, ECS Fargate (ap-south-1). Database: Amazon RDS for PostgreSQL 16 (ap-south-1). Queue: Redis 7 (container/ElastiCache, ap-south-1), redis:7-alpine. Object storage: S3 (ap-south-1 Mumbai) with SSE encryption. Email provider: SendGrid (SaaS API, outside the AWS India boundary).
-
-- ⚠ SendGrid is a third-party SaaS outside the AWS India region boundary; its own data-residency/DPDP posture for email content is not addressed in this input.
-
-### ARCH-TECH-FRONTEND · approved · source: architecture:technology_decisions:Frontend
-
-React 19 approved over Angular and Vue for the frontend stack.
-
-React 19 drives the roster-marking screen, dashboards, student views and report filters as a responsive SPA, paired with an accessible component library so core flows meet WCAG 2.1 AA / RPwD Act and remain usable on low-bandwidth mobile browsers.
-
-### ARCH-TECH-BACKEND · approved · source: architecture:technology_decisions:Backend
-
-FastAPI 0.115 approved over Django REST Framework and Flask for the backend stack.
-
-FastAPI 0.115 sits directly on pandas/openpyxl for Excel/CSV import and computation and on reportlab for PDF export, and runs an RQ worker for background jobs, so imports, recomputation and reports use first-class Python libraries.
-
-### ARCH-TECH-DB · approved · source: architecture:technology_decisions:Database
-
-PostgreSQL 16 approved over MySQL and SQLite for the database.
-
-Holds students, courses, timetables, sessions and marks; SQL aggregation computes per-student-per-course percentages for reports. Transactions commit a correction and its audit entry together, supporting tamper-evident history and DPDP consent records.
-
-### ARCH-TECH-CLOUD · approved · source: architecture:technology_decisions:Cloud
-
-AWS approved over Azure and GCP as the cloud provider.
-
-AWS's full regions in Mumbai/Hyderabad let the database, S3 files and logs be pinned to Indian soil for DPDP residency, with CloudWatch retaining ICT/audit logs 180 days per CERT-In; capacity is judged ample for one institution's term-start and marking peaks.
+**Related:** NFR-PERFORMANCE-SCALE, NFR-PRIVACY-SECURITY, EPIC-008
 <!-- sdlc:auto:end narrative -->
 
 <!-- sdlc:auto:start building-blocks -->

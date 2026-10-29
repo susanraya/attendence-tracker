@@ -5,7 +5,7 @@
 <!-- sdlc:auto:start overview -->
 attendence management system
 
-**Documentation version:** v2
+**Documentation version:** v1
 <!-- sdlc:auto:end overview -->
 
 ## Contents
@@ -14,24 +14,24 @@ attendence management system
 | Document | State |
 |---|---|
 | [Requirements](requirements/README.md) | v1 approved |
-| [Architecture](architecture/README.md) | 19 entries |
-| [Development](development/README.md) | 0 entries |
-| [Testing](testing/README.md) | 0 entries |
-| [Deployment](deployment/README.md) | 0 entries |
-| [Maintenance](maintenance/README.md) | 0 entries |
+| [Architecture](architecture/README.md) | 8 entries |
+| [Development](development/README.md) | 1 entry |
+| [Testing](testing/README.md) | 1 entry |
+| [Deployment](deployment/README.md) | 1 entry |
+| [Maintenance](maintenance/README.md) | 1 entry |
 | [Data model](architecture/data-model.md) | generated |
 | [API (OpenAPI)](architecture/api/openapi.yaml) | generated |
 | [Decisions (ADRs)](architecture/adr/README.md) | 4 decisions |
 | [Sprint plan](development/sprint-plan.md) | not generated yet |
-| [Developer guide](development/developer-guide.md) | generated |
-| [API reference](development/api-reference.md) | 1 route |
+| [Developer guide](development/developer-guide.md) | not generated yet |
+| [API reference](development/api-reference.md) | 0 routes |
 | [Test report](testing/test-report.md) | not run yet |
 | [Tests](testing/test-cases.md) | 0 tests |
 | [Deployment guide](deployment/deployment-guide.md) | not deployed yet |
 | [Runbook](deployment/runbook.md) | not deployed yet |
 | [Release notes](deployment/release-notes.md) | 0 releases |
 | [Traceability matrix](traceability-matrix.md) | 20 requirements |
-| [Changelog](CHANGELOG.md) | 2 versions |
+| [Changelog](CHANGELOG.md) | 1 version |
 <!-- sdlc:auto:end contents -->
 
 ## Open gaps
@@ -39,22 +39,29 @@ attendence management system
 <!-- sdlc:auto:start open-gaps -->
 ### Requirements
 
-- No architecture document yet translates this approved stack into a component/deployment design — architecture phase has not started.
-- Reset-link expiry/validity period is not specified.
-- Exact delivery mechanism for the 'initial credential' (temporary password vs. reset-link-only) is not specified.
-- No mechanism for verifiable parental/guardian consent for any enrolled student under 18 is described; confirm whether any students are minors, since current scope assumes guardians have no accounts.
-- DPDP breach-notification duties and 'Significant Data Fiduciary' obligations (in-India DPO, audits, impact assessments) are not addressed by this or any other story.
-- Exact required column schema/template for student, course, and timetable files is not specified.
-- Display precision (number of decimal places) for the percentage is not specified.
-- Which specific AWS region(s) (Mumbai vs. Hyderabad) will be used, and whether backups/disaster-recovery copies also stay in-India, is not yet specified — for the architecture phase to confirm.
-- CERT-In also requires reporting qualifying cyber incidents to CERT-In within 6 hours; no requirement in this input addresses that reporting obligation.
-- No accessibility audit or test plan yet exists to verify WCAG 2.1 AA / RPwD conformance — to be confirmed in the testing phase.
-- CERT-In 6-hour incident-reporting obligation to the authority itself is not covered by this NFR.
+- Assumption that parents/guardians have no accounts is not yet confirmed by the institution.
+- DPDP data-principal rights beyond consent withdrawal (e.g. access, correction, erasure, grievance redressal) are not specified.
+- Verifiable parental consent for students under 18 (required by DPDP for minors) is not addressed; unclear if any enrolled students are minors.
+- No live SIS/ERP or LMS integration (LTI/OneRoster/SCORM) is implemented - confirm this is acceptable long-term or only an initial-scope limitation.
+- No leave-application or condonation workflow exists in this scope - confirm this matches institutional policy for exam eligibility decisions.
+- CERT-In's 6-hour cyber-incident reporting obligation and DPDP's breach-notification-to-Board/affected-persons process are not addressed beyond log retention.
+- Significant Data Fiduciary obligations (in-India DPO, periodic audits, data protection impact assessment) have not been evaluated for this institution.
+- DPDP consent-manager mechanism is not addressed - current design only captures a direct acknowledge/withdraw action.
+- GIGW guidelines applicability is unconfirmed (relevant only if this is a government-run institution).
 
-### Architecture
+### Development
 
-- No explicit mapping given between this architecture and the specific US-001..US-020 requirement descriptions, so traceability to individual requirements could not be confirmed.
-- DPDP, CERT-In and RPwD Act are named as compliance drivers but no dedicated compliance/control checklist was supplied for this phase -- recommend a human confirm all applicable controls are covered.
-- Delivery-tracking data is mentioned but no retention/visibility mechanism for tracking data is specified.
-- SendGrid is a third-party SaaS outside the AWS India region boundary; its own data-residency/DPDP posture for email content is not addressed in this input.
+- Development has not started or no development records have been supplied - no tickets, commits, or implementation notes exist to document.
+
+### Testing
+
+- Testing phase has not started - no test plans or results are available yet.
+
+### Deployment
+
+- No deployment recorded yet - the system has not been released to any environment as far as this input shows.
+
+### Maintenance
+
+- No post-deployment/maintenance notes recorded yet - project has not reached operations.
 <!-- sdlc:auto:end open-gaps -->
